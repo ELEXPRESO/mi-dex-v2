@@ -82,16 +82,37 @@
 
         <section class="mb-8">
             <h2 class="text-2xl font-bold mb-4">Panel de Control</h2>
+            <!-- MODIFICADO: El botón ahora abre un modal de selección -->
             <button id="capture-btn" class="w-full bg-poke-red text-white font-bold text-lg py-4 px-6 rounded-lg shadow-lg transition-transform duration-200 hover:scale-105 hover:shadow-red-glow focus:outline-none focus:ring-4 focus:ring-red-500/50">
-                📸 ¡Captura un Phurito!
+                ➕ Añadir Nuevo Descubrimiento
             </button>
         </section>
 
         <main>
             <h2 class="text-2xl font-bold mb-4">Galería de Descubrimientos</h2>
             <div id="gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
-            <p id="empty-gallery-msg" class="text-center text-gray-400 py-10 hidden">Aún no hay descubrimientos. ¡Presiona "Captura un Phurito!" para añadir el primero.</p>
+            <p id="empty-gallery-msg" class="text-center text-gray-400 py-10 hidden">Aún no hay descubrimientos. ¡Presiona "Añadir Nuevo Descubrimiento" para añadir el primero.</p>
         </main>
+    </div>
+
+    <!-- NUEVO: Modal de selección de fuente -->
+    <div id="source-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+        <div class="bg-poke-dark border-2 border-poke-red rounded-2xl shadow-red-glow w-full max-w-md">
+            <div class="p-5">
+                <h3 class="text-xl font-bold text-white mb-4 text-center">¿Desde dónde quieres añadir el descubrimiento?</h3>
+                <div class="flex flex-col gap-3">
+                    <button id="take-photo-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-5 rounded-lg transition-transform duration-200 hover:scale-105">
+                        📸 Tomar una Foto Nueva
+                    </button>
+                    <button id="choose-gallery-btn" class="w-full bg-green-600 text-white font-bold py-3 px-5 rounded-lg transition-transform duration-200 hover:scale-105">
+                        🖼️ Elegir de la Galería
+                    </button>
+                    <button id="cancel-source-btn" class="w-full bg-poke-gray text-white font-bold py-3 px-5 rounded-lg transition-transform duration-200 hover:scale-105">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="detail-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
@@ -148,6 +169,12 @@
             const emptyGalleryMsg = document.getElementById('empty-gallery-msg');
             const captureBtn = document.getElementById('capture-btn');
             
+            // NUEVOS: Elementos del modal de selección
+            const sourceModal = document.getElementById('source-modal');
+            const takePhotoBtn = document.getElementById('take-photo-btn');
+            const chooseGalleryBtn = document.getElementById('choose-gallery-btn');
+            const cancelSourceBtn = document.getElementById('cancel-source-btn');
+
             const detailModal = document.getElementById('detail-modal');
             const closeDetailBtn = document.getElementById('close-detail-btn');
             const saveDetailBtn = document.getElementById('save-detail-btn');
@@ -213,7 +240,6 @@
                 });
             }
 
-            /* 🔧 NUEVA FUNCIÓN: Optimizar imagen antes de guardar */
             function optimizeImage(base64, maxSize = 800) {
                 return new Promise((resolve) => {
                     const img = new Image();
@@ -329,28 +355,91 @@
                 }
             });
 
-            /* 📸 Captura con optimización */
-            function captureNewEntry() {
+            // --- NUEVAS FUNCIONES PARA LA FUENTE DE LA IMAGEN ---
+
+            // Función para procesar un archivo de imagen (común para cámara y galería)
+            async function processImageFile(file) {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const originalData = e.target.result;
+                    const optimizedData = await optimizeImage(originalData, 800);
+                    const assignedRarity = await analyzeImageForRarity(optimizedData);
+                    const newId = Date.now();
+                    const newEntry = { id: newId, name: 'Nuevo Phurito Capturado', image: optimizedData, description: '', rarity: assignedRarity };
+                    const entries = getEntries(); 
+                    entries.push(newEntry); 
+                    saveEntries(entries);
+                    loadApp(); 
+                    showDetailModal(newId);
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // Función para iniciar la captura desde la cámara
+            function captureFromCamera() {
                 const input = document.createElement('input');
-                input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.capture = 'environment'; // Fuerza la cámara
                 input.onchange = event => {
                     const file = event.target.files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = async (e) => {
-                            const originalData = e.target.result;
-                            const optimizedData = await optimizeImage(originalData, 800);
-                            const assignedRarity = await analyzeImageForRarity(optimizedData);
-                            const newId = Date.now();
-                            const newEntry = { id: newId, name: 'Nuevo Phurito Capturado', image: optimizedData, description: '', rarity: assignedRarity };
-                            const entries = getEntries(); entries.push(newEntry); saveEntries(entries);
-                            loadApp(); showDetailModal(newId);
-                        };
-                        reader.readAsDataURL(file);
+                        processImageFile(file);
                     }
                 };
                 input.click();
             }
+
+            // Función para iniciar la selección desde la galería
+            function chooseFromGallery() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                // Sin 'capture', el navegador mostrará la opción de elegir archivo
+                input.onchange = event => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        processImageFile(file);
+                    }
+                };
+                input.click();
+            }
+            
+            // --- NUEVOS EVENT LISTENERS Y MODALES ---
+
+            // Muestra el modal de selección de fuente
+            function showSourceModal() {
+                sourceModal.classList.remove('hidden');
+            }
+
+            // Oculta el modal de selección de fuente
+            function hideSourceModal() {
+                sourceModal.classList.add('hidden');
+            }
+            
+            // MODIFICADO: El botón principal ahora muestra el modal de selección
+            captureBtn.addEventListener('click', showSourceModal);
+            
+            // Evento para el botón de tomar foto
+            takePhotoBtn.addEventListener('click', () => {
+                hideSourceModal();
+                captureFromCamera();
+            });
+
+            // Evento para el botón de elegir de galería
+            chooseGalleryBtn.addEventListener('click', () => {
+                hideSourceModal();
+                chooseFromGallery();
+            });
+
+            // Evento para cancelar
+            cancelSourceBtn.addEventListener('click', hideSourceModal);
+
+            // Cerrar modal al hacer clic fuera
+            sourceModal.addEventListener('click', (event) => { if (event.target === sourceModal) { hideSourceModal(); } });
+
+
+            // --- EL RESTO DEL CÓDIGO PERMANECE IGUAL ---
 
             function showDetailModal(id) {
                 const entries = getEntries(); const entryIndex = entries.findIndex(e => e.id == id);
@@ -399,7 +488,6 @@
                 }
             }
 
-            captureBtn.addEventListener('click', captureNewEntry);
             closeDetailBtn.addEventListener('click', hideDetailModal);
             saveDetailBtn.addEventListener('click', saveEntryDetails);
             deleteEntryBtn.addEventListener('click', handleDeleteClick);
@@ -408,6 +496,7 @@
                 if (galleryItem) { const entryId = galleryItem.dataset.entryId; showDetailModal(entryId); }
             });
             detailModal.addEventListener('click', (event) => { if (event.target === detailModal) { hideDetailModal(); } });
+            
             loadApp();
         });
     </script>
