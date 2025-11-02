@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiDex v2 - Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        #rarity-analysis-canvas {
+            display: none;
+        }
+        .rarity-panel-content {
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            max-height: 0;
+            overflow: hidden;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        .rarity-panel-content.open {
+            max-height: 600px; 
+            padding-top: 1rem; 
+            padding-bottom: 0.5rem;
+        }
+        #detail-modal > div {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 'orbitron': ['Orbitron', 'sans-serif'] },
+                    colors: {
+                        'poke-red': '#ff0000',
+                        'poke-dark': '#222222',
+                        'poke-light': '#f0f0f0',
+                        'poke-gray': '#3a3a3a',
+                        'rarity-comun': '#9CA3AF',
+                        'rarity-raro': '#3B82F6',
+                        'rarity-epico': '#9333EA',
+                        'rarity-legendario': '#FBBF24',
+                        'rarity-primordial': '#E879F9',
+                    },
+                    boxShadow: {
+                        'red-glow': '0 0 20px rgba(255, 0, 0, 0.5)',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-poke-dark text-poke-light font-orbitron p-5 min-h-screen">
+
+    <canvas id="rarity-analysis-canvas" width="100" height="100"></canvas>
+
+    <div class="container mx-auto max-w-4xl">
+        
+        <header class="text-center border-b-2 border-poke-red pb-4 mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-white mb-2">MiDex v2</h1>
+            <p class="text-lg text-gray-300">Panel de Control de Descubrimientos</p>
+        </header>
+
+        <section class="mb-8 p-6 bg-poke-gray rounded-xl border-2 border-poke-red shadow-red-glow">
+            <h2 class="text-2xl font-bold mb-4">Resumen del Sistema</h2>
+            <p class="mb-6 text-gray-300">
+                Este es su panel de control para gestionar todos los descubrimientos capturados. Revise sus estadísticas, añada nuevas entradas y gestione su colección.
+            </p>
+            <div id="stats-panel" class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                <div class="md:col-span-1 col-span-2 bg-poke-dark p-4 rounded-lg shadow-lg border-2 border-poke-red">
+                    <span class="text-lg text-gray-400 block">Total</span>
+                    <span id="total-count" class="text-3xl font-black text-poke-red">0</span>
+                </div>
+                <div id="rarity-stats" class="col-span-2 md:col-span-4 grid grid-cols-1 sm:grid-cols-4 gap-4"></div>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold mb-4">Panel de Control</h2>
+            <button id="capture-btn" class="w-full bg-poke-red text-white font-bold text-lg py-4 px-6 rounded-lg shadow-lg transition-transform duration-200 hover:scale-105 hover:shadow-red-glow focus:outline-none focus:ring-4 focus:ring-red-500/50">
+                📸 ¡Captura un Phurito!
+            </button>
+        </section>
+
+        <main>
+            <h2 class="text-2xl font-bold mb-4">Galería de Descubrimientos</h2>
+            <div id="gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+            <p id="empty-gallery-msg" class="text-center text-gray-400 py-10 hidden">Aún no hay descubrimientos. ¡Presiona "Captura un Phurito!" para añadir el primero.</p>
+        </main>
+    </div>
+
+    <div id="detail-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+        <div class="bg-poke-dark border-2 border-poke-red rounded-2xl shadow-red-glow w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-5 border-b border-poke-red/50">
+                <h2 id="detail-number" class="text-2xl font-bold text-poke-red">#0000</h2>
+                <button id="close-detail-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <div class="p-5">
+                <div class="mb-4 bg-poke-gray p-3 rounded-lg border border-poke-red/50">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-bold text-gray-300">Rareza Asignada: <span id="current-rarity-display" class="font-black text-white"></span></span>
+                        <button id="toggle-rarity-panel" class="text-xs text-poke-red font-bold py-1 px-2 rounded-md hover:bg-poke-dark transition duration-150">
+                            Ajustar Rareza Manualmente (▼)
+                        </button>
+                    </div>
+                    <div id="manual-rarity-panel" class="rarity-panel-content">
+                        <label class="block text-sm font-bold text-gray-400 mb-2">Selección Manual:</label>
+                        <div id="rarity-selector" class="flex gap-2 justify-start flex-wrap"></div>
+                    </div>
+                </div>
+                <img id="detail-image" src="" alt="Imagen del descubrimiento" class="w-full h-64 object-contain rounded-lg bg-black mb-4">
+                <div class="mb-4">
+                    <label for="detail-name" class="block text-sm font-bold text-gray-300 mb-1">Nombre</label>
+                    <input type="text" id="detail-name" placeholder="Nombre del descubrimiento" class="w-full p-3 bg-poke-light text-poke-dark rounded-md font-orbitron border-2 border-transparent focus:border-poke-red focus:outline-none focus:ring-0">
+                </div>
+                <div class="mb-6">
+                    <label for="detail-description" class="block text-sm font-bold text-gray-300 mb-1">Descripción</label>
+                    <textarea id="detail-description" rows="4" placeholder="Añade una descripción..." class="w-full p-3 bg-poke-light text-poke-dark rounded-md font-orbitron resize-none border-2 border-transparent focus:border-poke-red focus:outline-none focus:ring-0"></textarea>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button id="save-detail-btn" class="flex-1 bg-green-600 text-white font-bold py-3 px-5 rounded-lg transition-transform duration-200 hover:scale-105">💾 Guardar Cambios</button>
+                    <button id="delete-entry-btn" class="flex-1 bg-red-600 text-white font-bold py-3 px-5 rounded-lg transition-all duration-200 hover:scale-105">🗑️ Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const RARITIES = [
+            { key: 'comun', label: 'Común', color: 'text-gray-900 bg-gray-300 hover:bg-gray-400 border-rarity-comun', border: 'border-rarity-comun', text: 'text-rarity-comun' },
+            { key: 'raro', label: 'Raro', color: 'text-blue-900 bg-blue-300 hover:bg-blue-400 border-rarity-raro', border: 'border-rarity-raro', text: 'text-rarity-raro' },
+            { key: 'epico', label: 'Épico', color: 'text-purple-900 bg-purple-300 hover:bg-purple-400 border-rarity-epico', border: 'border-rarity-epico', text: 'text-rarity-epico' },
+            { key: 'legendario', label: 'Legendario', color: 'text-yellow-900 bg-yellow-300 hover:bg-yellow-400 border-rarity-legendario', border: 'border-rarity-legendario', text: 'text-rarity-legendario' },
+            { key: 'primordial', label: 'Primordial', color: 'text-fuchsia-900 bg-fuchsia-200 hover:bg-fuchsia-300 border-rarity-primordial', border: 'border-rarity-primordial', text: 'text-rarity-primordial' },
+        ];
+
+        const RARITY_MAP = RARITIES.reduce((acc, r) => { acc[r.key] = r; return acc; }, {});
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const totalCountEl = document.getElementById('total-count');
+            const rarityStatsPanel = document.getElementById('rarity-stats');
+            const gallery = document.getElementById('gallery');
+            const emptyGalleryMsg = document.getElementById('empty-gallery-msg');
+            const captureBtn = document.getElementById('capture-btn');
+            
+            const detailModal = document.getElementById('detail-modal');
+            const closeDetailBtn = document.getElementById('close-detail-btn');
+            const saveDetailBtn = document.getElementById('save-detail-btn');
+            const deleteEntryBtn = document.getElementById('delete-entry-btn');
+            
+            const detailNumberEl = document.getElementById('detail-number');
+            const detailImageEl = document.getElementById('detail-image');
+            const detailNameEl = document.getElementById('detail-name');
+            const detailDescriptionEl = document.getElementById('detail-description');
+            
+            const raritySelector = document.getElementById('rarity-selector');
+            const currentRarityDisplay = document.getElementById('current-rarity-display');
+            const toggleRarityPanelBtn = document.getElementById('toggle-rarity-panel');
+            const manualRarityPanel = document.getElementById('manual-rarity-panel');
+
+            const canvas = document.getElementById('rarity-analysis-canvas');
+            const ctx = canvas.getContext('2d');
+
+            let currentEntryId = null;
+            let deleteConfirmState = false;
+            let currentRarity = 'comun';
+            const STORAGE_KEY = 'pokedexEntries_v2';
+
+            function getEntries() {
+                const entries = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                entries.sort((a, b) => a.id - b.id);
+                return entries;
+            }
+
+            function saveEntries(entries) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+            }
+
+            function formatEntryNumber(index) {
+                return String(index + 1).padStart(4, '0');
+            }
+
+            function analyzeImageForRarity(imageData) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                        let totalLuminosity = 0;
+                        const pixelCount = data.length / 4;
+                        for (let i = 0; i < data.length; i += 4) {
+                            const r = data[i]; const g = data[i + 1]; const b = data[i + 2];
+                            const luminosity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                            totalLuminosity += luminosity;
+                        }
+                        const averageLuminosity = totalLuminosity / pixelCount;
+                        let rarity;
+                        if (averageLuminosity > 200) rarity = 'primordial';
+                        else if (averageLuminosity > 160) rarity = 'legendario';
+                        else if (averageLuminosity > 120) rarity = 'epico';
+                        else if (averageLuminosity > 80) rarity = 'raro';
+                        else rarity = 'comun';
+                        resolve(rarity);
+                    };
+                    img.onerror = () => resolve('comun');
+                    img.src = imageData;
+                });
+            }
+
+            /* 🔧 NUEVA FUNCIÓN: Optimizar imagen antes de guardar */
+            function optimizeImage(base64, maxSize = 800) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        let { width, height } = img;
+                        if (width > height) {
+                            if (width > maxSize) {
+                                height = Math.round(height * (maxSize / width));
+                                width = maxSize;
+                            }
+                        } else {
+                            if (height > maxSize) {
+                                width = Math.round(width * (maxSize / height));
+                                height = maxSize;
+                            }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const optimizedData = canvas.toDataURL('image/jpeg', 0.7);
+                        resolve(optimizedData);
+                    };
+                    img.onerror = () => resolve(base64);
+                    img.src = base64;
+                });
+            }
+
+            function renderStats(entries) {
+                totalCountEl.textContent = entries.length;
+                const rarityCounts = entries.reduce((acc, entry) => { const r = entry.rarity || 'comun'; acc[r] = (acc[r] || 0) + 1; return acc; }, {});
+                rarityStatsPanel.innerHTML = '';
+                RARITIES.forEach(r => {
+                    const count = rarityCounts[r.key] || 0;
+                    const card = document.createElement('div');
+                    card.className = `bg-poke-dark p-3 rounded-lg shadow-lg border-2 ${r.border} transition duration-300`;
+                    card.innerHTML = `<span class="text-sm text-gray-400 block">${r.label.substring(0, 4)}.</span><span class="text-xl font-black ${r.text}">${count}</span>`;
+                    rarityStatsPanel.appendChild(card);
+                });
+                if (entries.length > 0) { emptyGalleryMsg.classList.add('hidden'); gallery.classList.remove('hidden'); }
+                else { emptyGalleryMsg.classList.remove('hidden'); gallery.classList.add('hidden'); }
+            }
+
+            function renderGallery(entries) {
+                gallery.innerHTML = '';
+                entries.forEach((entry, index) => {
+                    const entryNumber = formatEntryNumber(index);
+                    const rarityKey = entry.rarity || 'comun';
+                    const rarityData = RARITY_MAP[rarityKey];
+                    const rarityBorderClass = rarityData?.border || RARITY_MAP['comun'].border;
+                    const rarityTextClass = rarityData?.text || RARITY_MAP['comun'].text;
+                    const rarityLabel = rarityData?.label || 'Común';
+                    
+                    const item = document.createElement('div');
+                    item.className = `gallery-item bg-poke-gray rounded-lg border-2 overflow-hidden shadow-lg cursor-pointer transition-transform duration-200 hover:scale-105 ${rarityBorderClass}`;
+                    item.dataset.entryId = entry.id;
+                    item.innerHTML = `
+                        <img src="${entry.image}" alt="${entry.name}" class="w-full h-32 sm:h-40 object-cover bg-black">
+                        <div class="p-3 text-center">
+                            <span class="block text-xs font-bold text-poke-red">#${entryNumber}</span>
+                            <p class="text-sm font-semibold truncate text-white">${entry.name}</p>
+                            <span class="block text-xs font-black mt-1 ${rarityTextClass}">${rarityLabel}</span>
+                        </div>
+                    `;
+                    gallery.appendChild(item);
+                });
+            }
+
+            function loadApp() {
+                const entries = getEntries();
+                renderStats(entries);
+                renderGallery(entries);
+            }
+
+            function updateRarityUI(selectedRarity) {
+                document.querySelectorAll('.rarity-chip').forEach(chip => {
+                    chip.classList.remove('scale-105', 'shadow-white/70', 'shadow-lg', 'border-4');
+                    chip.classList.add('scale-100', 'border-2'); 
+                    if (chip.dataset.rarity === selectedRarity) {
+                        chip.classList.add('scale-105', 'shadow-white/70', 'shadow-lg', 'border-4');
+                        chip.classList.remove('scale-100', 'border-2');
+                    }
+                });
+                const rarityLabel = RARITY_MAP[selectedRarity]?.label || RARITY_MAP['comun'].label;
+                const rarityTextClass = RARITY_MAP[selectedRarity]?.text || RARITY_MAP['comun'].text;
+                currentRarityDisplay.textContent = rarityLabel.toUpperCase();
+                currentRarityDisplay.className = `font-black text-white ${rarityTextClass}`;
+            }
+
+            function toggleManualRarityPanel() {
+                const isOpen = manualRarityPanel.classList.toggle('open');
+                toggleRarityPanelBtn.textContent = isOpen ? 'Ocultar Ajuste Manual (▲)' : 'Ajustar Rareza Manualmente (▼)';
+            }
+            toggleRarityPanelBtn.addEventListener('click', toggleManualRarityPanel);
+
+            if (raritySelector.innerHTML === '') {
+                RARITIES.forEach(r => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.dataset.rarity = r.key;
+                    button.textContent = r.label;
+                    button.className = `rarity-chip transition duration-150 text-xs py-1 px-3 font-bold rounded-full border-2 cursor-pointer ${r.color}`;
+                    raritySelector.appendChild(button);
+                });
+            }
+            
+            raritySelector.addEventListener('click', (event) => {
+                const chip = event.target.closest('.rarity-chip');
+                if (chip) {
+                    currentRarity = chip.dataset.rarity;
+                    updateRarityUI(currentRarity);
+                }
+            });
+
+            /* 📸 Captura con optimización */
+            function captureNewEntry() {
+                const input = document.createElement('input');
+                input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+                input.onchange = event => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = async (e) => {
+                            const originalData = e.target.result;
+                            const optimizedData = await optimizeImage(originalData, 800);
+                            const assignedRarity = await analyzeImageForRarity(optimizedData);
+                            const newId = Date.now();
+                            const newEntry = { id: newId, name: 'Nuevo Phurito Capturado', image: optimizedData, description: '', rarity: assignedRarity };
+                            const entries = getEntries(); entries.push(newEntry); saveEntries(entries);
+                            loadApp(); showDetailModal(newId);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+                input.click();
+            }
+
+            function showDetailModal(id) {
+                const entries = getEntries(); const entryIndex = entries.findIndex(e => e.id == id);
+                if (entryIndex === -1) return;
+                const entry = entries[entryIndex]; currentEntryId = id; deleteConfirmState = false;
+                manualRarityPanel.classList.remove('open');
+                toggleRarityPanelBtn.textContent = 'Ajustar Rareza Manualmente (▼)';
+                currentRarity = entry.rarity || 'comun';
+                updateRarityUI(currentRarity);
+                detailNumberEl.textContent = `#${formatEntryNumber(entryIndex)}`;
+                detailImageEl.src = entry.image;
+                detailNameEl.value = entry.name;
+                detailDescriptionEl.value = entry.description || '';
+                deleteEntryBtn.textContent = '🗑️ Eliminar';
+                deleteEntryBtn.classList.remove('bg-red-800', 'hover:bg-red-900', 'scale-105');
+                deleteEntryBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                detailModal.classList.remove('hidden');
+            }
+
+            function hideDetailModal() {
+                detailModal.classList.add('hidden'); currentEntryId = null; deleteConfirmState = false;
+            }
+
+            function saveEntryDetails() {
+                if (!currentEntryId) return;
+                const entries = getEntries(); const entryIndex = entries.findIndex(e => e.id == currentEntryId);
+                if (entryIndex !== -1) {
+                    entries[entryIndex].name = detailNameEl.value.trim() || 'Sin nombre';
+                    entries[entryIndex].description = detailDescriptionEl.value.trim();
+                    entries[entryIndex].rarity = currentRarity;
+                    saveEntries(entries);
+                    loadApp(); hideDetailModal();
+                }
+            }
+
+            function handleDeleteClick() {
+                if (!currentEntryId) return;
+                if (deleteConfirmState) {
+                    let entries = getEntries(); entries = entries.filter(e => e.id != currentEntryId); saveEntries(entries);
+                    loadApp(); hideDetailModal();
+                } else {
+                    deleteConfirmState = true;
+                    deleteEntryBtn.textContent = '¿Confirmar Eliminación?';
+                    deleteEntryBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    deleteEntryBtn.classList.add('bg-red-800', 'hover:bg-red-900', 'scale-105');
+                }
+            }
+
+            captureBtn.addEventListener('click', captureNewEntry);
+            closeDetailBtn.addEventListener('click', hideDetailModal);
+            saveDetailBtn.addEventListener('click', saveEntryDetails);
+            deleteEntryBtn.addEventListener('click', handleDeleteClick);
+            gallery.addEventListener('click', event => {
+                const galleryItem = event.target.closest('.gallery-item');
+                if (galleryItem) { const entryId = galleryItem.dataset.entryId; showDetailModal(entryId); }
+            });
+            detailModal.addEventListener('click', (event) => { if (event.target === detailModal) { hideDetailModal(); } });
+            loadApp();
+        });
+    </script>
+</body>
+</html>
